@@ -24,8 +24,8 @@ def board_to_response(board):
 MEMOIZED_TABLE = {}
 BASEURL = "http://nyc.cs.berkeley.edu:8080/gcweb/service/gamesman/puzzles/connect4/getNextMoveValues;width=7;height=6;pieces=4;board="
 
-z#image = 'cropped_image2.png'
-image = 'img_1_big.jpg'
+#image = 'cropped_image2.png'
+image = './images/img_1_big.jpg'
 img = cv2.imread(image,1)
 img = cv2.resize(img, None, fx=1/4.0, fy =1/4.0)
 
@@ -37,7 +37,7 @@ w,h, c = img.shape
 #make_circles_image
 #cimg = cv2.cvtColor(edges,cv2.COLOR_BGR2GRAY)
 cimg = edges.copy()
-circles = cv2.HoughCircles(cimg,cv.CV_HOUGH_GRADIENT,10,25, param1=50,param2=30,minRadius=20,maxRadius=500s)
+circles = cv2.HoughCircles(cimg,cv.CV_HOUGH_GRADIENT,10,25, param1=50,param2=30,minRadius=20,maxRadius=500)
 circles = np.uint16(np.around(circles))
 #do a pass and remove ones massively larger and smaller than median size
 rads = []

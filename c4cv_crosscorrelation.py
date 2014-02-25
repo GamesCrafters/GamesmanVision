@@ -54,20 +54,20 @@ BASEURL = "http://nyc.cs.berkeley.edu:8080/gcweb/service/gamesman/puzzles/connec
 
 #image = 'cropped_image2.png'
 #image = 'img_1_big.jpg'
-image = 'img_2_big.jpg'
+image = './images/img_2_big.jpg'
 img = cv2.imread(image,1)
 img = cv2.resize(img, None, fx=1/50.0, fy =1/50.0)
 
 
-redpiece = 'redpiece_template.png'
+redpiece = './templates/redpiece_template.png'
 redpiece_template = cv2.imread(redpiece,1)
 redpiece_template = cv2.resize(redpiece_template, None, fx=1/50.0, fy=1/50.0)
 
-blackpiece = 'blackpiece_template.png'
+blackpiece = './templates/blackpiece_template.png'
 blackpiece_template = cv2.imread(blackpiece,1)
 blackpiece_template = cv2.resize(blackpiece_template, None, fx=1/4.0, fy=1/4.0)
 
-emptypiece = 'emptypiece_template.png'
+emptypiece = './templates/emptypiece_template.png'
 emptypiece_template = cv2.imread(emptypiece,1)
 emptypiece_template = cv2.resize(emptypiece_template, None, fx=1/4.0, fy=1/4.0)
 
