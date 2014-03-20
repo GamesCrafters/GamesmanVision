@@ -7,61 +7,47 @@ import math
 import urllib
 import string
 
+
+
+"""
 def lizMatchTemplate(a,b):
-    """
-    gotta rewrite to implement fft-based convolution.
-    this is impossible at slow speeds
-    """
-    out = a.copy()
-    for x in range(len(b)/2, len(a) - len(b)/2):
-        print "finishedrow"
-        for y in range(len(b[0])/2, len(a[0]) - len(b[0])/2):
-            #have center pixel in (x,y)
-            runningsum = [0,0,0]
-            for i in range(len(b)):
-                for j in range(len(b[0])):
-                    xd = x + (i-len(b)/2)
-                    yd = y + (j-len(b[0])/2)
-                    color = a[xd][yd]
-                    color2 = b[i,j]
-                    runningsum[0] += abs((int)(color[0]) - (int)(color2[0]))
-                    runningsum[1] += abs((int)(color[1]) - (int)(color2[1]))
-                    runningsum[2] += abs((int)(color[2]) - (int)(color2[2]))
-            runningsum[0] = runningsum[0] / (len(b)*len(b[0]))
-            runningsum[1] = runningsum[1] / (len(b)*len(b[0]))
-            runningsum[2] = runningsum[2] / (len(b)*len(b[0]))
-
-            out[i,j] = runningsum
-    return out
-
-
-
-def board_to_response(board):
-    board = string.replace(board, " ", "%20")
-    global MEMOIZED_TABLE
-    if board in MEMOIZED_TABLE:
-        return MEMOIZED_TABLE[board]
-    else:
-        url = urllib.urlopen(BASEURL + board)
-        html = url.read()
-        url.close()
-        ans = eval(html)['response']
-        MEMOIZED_TABLE[board] = ans
-        return ans
+    #zero-pad b to be same length as a
+    c = cv2.copyMakeBorder(b,len(a)-len(b),0,len(a[0])-len(b[0]),0,cv2.BORDER_CONSTANT,value=(0,0,0))
+    #break a and binto 3 channels
+    dftar = cv2.dft(np.float32(a[:,:,0]),flags = cv2.DFT_COMPLEX_OUTPUT)
+    dftag = cv2.dft(np.float32(a[:,:,1]),flags = cv2.DFT_COMPLEX_OUTPUT)
+    dftab = cv2.dft(np.float32(a[:,:,2]),flags = cv2.DFT_COMPLEX_OUTPUT)
+    dftcr = cv2.dft(np.float32(c[:,:,0]),flags = cv2.DFT_COMPLEX_OUTPUT)
+    dftcg = cv2.dft(np.float32(c[:,:,1]),flags = cv2.DFT_COMPLEX_OUTPUT)
+    dftcb = cv2.dft(np.float32(c[:,:,2]),flags = cv2.DFT_COMPLEX_OUTPUT)
     
-MEMOIZED_TABLE = {}
-BASEURL = "http://nyc.cs.berkeley.edu:8080/gcweb/service/gamesman/puzzles/connect4/getNextMoveValues;width=7;height=6;pieces=4;board="
+    #piecewise multiply together
+    for i in range(len(dftar)):
+        for j in range(len(dftar[0])):
+            dftar[i,j] = dftar[i,j] * dftcr[i,j]
+            dftag[i,j] = dftab[i,j] * dftcb[i,j]
+            dftab[i,j] = dftag[i,j] * dftcg[i,j]
+
+    #inverse fft
+    br = cv2.idft(dftar, flags=cv2.DFT_REAL_OUTPUT)
+    bg = cv2.idft(dftab, flags=cv2.DFT_REAL_OUTPUT)
+    bb = cv2.idft(dftag, flags=cv2.DFT_REAL_OUTPUT)
+    toret = cv2.merge((br,bg,bb))
+    return toret
+
+"""
+
 
 #image = 'cropped_image2.png'
 #image = 'img_1_big.jpg'
 image = './images/img_2_big.jpg'
 img = cv2.imread(image,1)
-img = cv2.resize(img, None, fx=1/50.0, fy =1/50.0)
+img = cv2.resize(img, None, fx=1/4.0, fy =1/4.0)
 
 
 redpiece = './templates/redpiece_template.png'
 redpiece_template = cv2.imread(redpiece,1)
-redpiece_template = cv2.resize(redpiece_template, None, fx=1/50.0, fy=1/50.0)
+redpiece_template = cv2.resize(redpiece_template, None, fx=1/4.0, fy=1/4.0)
 
 blackpiece = './templates/blackpiece_template.png'
 blackpiece_template = cv2.imread(blackpiece,1)
@@ -71,19 +57,54 @@ emptypiece = './templates/emptypiece_template.png'
 emptypiece_template = cv2.imread(emptypiece,1)
 emptypiece_template = cv2.resize(emptypiece_template, None, fx=1/4.0, fy=1/4.0)
 
+threshold1 = './templates/threshold_template1.png'
+threshold1_template = cv2.imread(threshold1,0)
+threshold1_template = cv2.resize(threshold1_template, None, fx=1/4.0, fy=1/4.0)
+
+
+
+#built-in matchTemplate
+#works for black out of box, not empty or red
+
+outr = cv2.matchTemplate(img[:,:,0],redpiece_template[:,:,0],cv.CV_TM_SQDIFF_NORMED)
+outg = cv2.matchTemplate(img[:,:,1],redpiece_template[:,:,1],cv.CV_TM_SQDIFF_NORMED)
+outb = cv2.matchTemplate(img[:,:,2],redpiece_template[:,:,2],cv.CV_TM_SQDIFF_NORMED)
+cv2.imshow("redtemplater",outr)
+cv2.imshow("redtempg",outg)
+cv2.imshow("redtemplateb",outb)
+    
+
+
 
 """
-perform fft-based cross correlation of redpiece_template and img
+#try thresholding red
+red = img[:,:,2]
+blue = img[:,:,1]
+green = img[:,:,0]
+thresholdedr = cv2.adaptiveThreshold(red,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 77, 15)
+cv2.imshow("threshold result", thresholdedr)
+
+thresholdedg = cv2.adaptiveThreshold(green,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 111, 2)
+cv2.imshow("lolthresholdg",thresholdedg)
+
+thresholdedb = cv2.adaptiveThreshold(blue,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 111, 2)
+cv2.imshow("lolthresholdb",thresholdedb)
 """
 
 
-out = lizMatchTemplate(img,redpiece_template)
-out = cv2.resize(out, None, fx=10.0, fy =10.0)
-
-cv2.imshow("redtemplate",out)
 """
-out = cv2.matchTemplate(img,redpiece_template,cv.CV_TM_SQDIFF_NORMED)
-cv2.imshow("redtemplate",out)
+#find circles in thresholded image
+circles = cv2.HoughCircles(thresholdedr,cv.CV_HOUGH_GRADIENT,1.0,50,param1=50,param2=20,minRadius=5,maxRadius=50)
+circles = np.uint16(np.around(circles))
+for i in circles[0,:]:
+    # draw the outer circle
+    cv2.circle(img,(i[0],i[1]),i[2],(255,255,255),2)
+    # draw the center of the circle
+    cv2.circle(img,(i[0],i[1]),2,(0,0,255),3)
+""" 
+
+#try doing red - green - blue
+
 
 
 out = cv2.matchTemplate(img,blackpiece_template,cv.CV_TM_SQDIFF_NORMED)
@@ -92,53 +113,17 @@ cv2.imshow("blacktemplate",out)
 
 out = cv2.matchTemplate(img,emptypiece_template,cv.CV_TM_SQDIFF_NORMED)
 cv2.imshow("emptytemplate",out)
+
+
+
+
 """
+perform fft-based cross correlation of redpiece_template and img
+"""
+#out = lizMatchTemplate(img,redpiece_template)
 
+#cv2.imshow("redtemplate",out)
 
-found = 0
-BOARD = ""
-#generate board string if found!
-if(found):
-    #generate sampling distance
-    sd = (centers[1][0][0] - centers[0][0][0])/4.0
-    print sd
-    for item in centers:
-        #circles will be in order.
-        runningsum = (0,0,0)
-        cy = item[0][0]
-        cx = item[0][1]
-        for i in range(0,25):
-            #sample 25 points and get their colors
-            dist = random.random()*sd
-            angle = random.random()*3.14
-            x = math.cos(angle)*dist
-            y = math.sin(angle)*dist
-            color = img[cx+x,cy+y]
-            runningsum += color
-        runningsum = runningsum / 25
-        #classify color
-        color = "blank"
-        if(runningsum[0] < 50  and runningsum[1] < 50 and runningsum[2] < 50):
-            color = "black"
-            BOARD = BOARD + "O"
-        elif(runningsum[0] < 200 and runningsum[1] < 200 and runningsum[2] > 200):
-            color = "red"
-            BOARD = BOARD + "X"
-        else:
-            BOARD = BOARD + " "
-
-if(len(BOARD) == 42):
-    #need to fix board first
-    newboard = BOARD[35:42]  + BOARD[28:35] + BOARD[21:28] + BOARD[14:21] + BOARD[7:14] + BOARD[0:7]
-    print "Pinging server with board:  ;", newboard, ";"
-    print BOARD[0:7]
-    print BOARD[7:14]
-    print BOARD[14:21]
-    print BOARD[21:28]
-    print BOARD[28:35]
-    print BOARD[35:42]
-    #ans = board_to_response(newboard)
-        
 
 
 cv2.imshow('image',img)
