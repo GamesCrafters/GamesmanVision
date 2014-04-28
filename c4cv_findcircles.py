@@ -15,12 +15,15 @@ socket.setdefaulttimeout(default_timeout)
 
 
 #global parameter of piece size.  in future need to learn this actively.
-piecesize = 20
-color_threshold = 8000
+screenpercent = .9
+piecesize = 45
+color_threshold = 5000
 RED_SIGN = "X" #determined by first color
 BLACK_SIGN = "O"  #determined by first color
 MEMOIZED_TABLE = {}
 BASEURL = "http://nyc.cs.berkeley.edu:8080/gcweb/service/gamesman/puzzles/connect4/getNextMoveValues;width=7;height=6;pieces=4;board="
+offlinemode = 0
+avgcenters = None
 
 def board_to_response(board):
     """
@@ -32,15 +35,19 @@ def board_to_response(board):
         if MEMOIZED_TABLE[board] != "failed":
             return MEMOIZED_TABLE[board]
     ans = "failed"
-    try:
-        board = board.replace(" ","%20")
-        url = urllib2.urlopen(BASEURL + board, timeout=.25)
-        html = url.read()
-        url.close()
-        ans = eval(html)['response']
-    except:
-        print "Bad URL or timeout or response"
-    MEMOIZED_TABLE[board] = ans
+    xnum = board.count("X")
+    onum = board.count("O")
+    if not(xnum > onum+1 or xnum < onum):  
+        try:
+            if(not offlinemode):
+                board = board.replace(" ","%20")
+                url = urllib2.urlopen(BASEURL + board, timeout=1)
+                html = url.read()
+                url.close()
+                ans = eval(html)['response']
+                MEMOIZED_TABLE[board] = ans
+        except:
+            print "Bad URL or timeout or response or offlinemode is on"
     return ans
 
 
@@ -98,8 +105,8 @@ def lizFindCirclesGrid(circles):
     return finalout, centers_kmeans_x, centers_kmeans_y
 
 def drawBoardOverlay(image):
-    upperleft = (int(image.shape[1] * 1/4.0), int(image.shape[0]   * 1/4.0))
-    lowerright = (int(image.shape[1] * 3/4.0), int(image.shape[0] * 3/4.0))
+    upperleft = (int(image.shape[1] * (1-screenpercent)), int(image.shape[0]   * (1-screenpercent)))
+    lowerright = (int(image.shape[1] * screenpercent), int(image.shape[0] * screenpercent))
     cv2.rectangle(image,upperleft,lowerright,(1,1,1),thickness=5)
     return image
 
@@ -118,26 +125,28 @@ def gamesmanVision(capture):
     """
     main function.  recursively calls until escape command.
     """
-    testimage = 0
+    testimage = 1
     img = None    #this is the image for analysis, cropped from original
     image = None  #this is the original image
 
-    blacktemp = './templates/blackpiece_template.png'
-    redtemp = './templates/redpiece_template.png'
+
+
+    blacktemp = './templates/blackpiece_template_dark.png'
+    redtemp = './templates/redpiece_template_dark.png'
     
-    blackcolor = determineTemplateColor(cv2.imread(blacktemp),25)
-    redcolor = determineTemplateColor(cv2.imread(redtemp),25)
+    blackcolor = determineTemplateColor(cv2.imread(blacktemp),10)
+    redcolor = determineTemplateColor(cv2.imread(redtemp),10)
 
     width = 0
     height = 0
     if(not testimage):
         #capture image from webcam, add rectangle
         image = captureImage(capture)
-
+        cv2.imwrite("output.png",image) #calibration purposes
         #grabs center 50% for processing
         height = image.shape[1]
         width = image.shape[0]
-        img = image[.25*width:.75*width, .25*height:.75*height]
+        img = image[(1-screenpercent)*width:screenpercent*width, (1-screenpercent)*height:screenpercent*height]
 
     while(cv2.waitKey(1) <= 0):                    
         if(not testimage):
@@ -147,7 +156,7 @@ def gamesmanVision(capture):
             #grabs center 50% for processing
             height = image.shape[1]
             width = image.shape[0]
-            img = image[.25*width:.75*width, .25*height:.75*height]
+            img = image[(1-screenpercent)*width:screenpercent*width, (1-screenpercent)*height:screenpercent*height]
 
         #test images
         if(testimage):
@@ -196,8 +205,10 @@ def gamesmanVision(capture):
         centers = None
         centers_kmeans_x = None
         centers_kmeans_y = None
-        (centers, centers_kmeans_x, centers_kmeans_y) = lizFindCirclesGrid(circles_culled)
-
+        try:
+            (centers, centers_kmeans_x, centers_kmeans_y) = lizFindCirclesGrid(circles_culled)
+        except:
+            pass
         try:
             (centers, centers_kmeans_x, centers_kmeans_y) = lizFindCirclesGrid(circles_culled)
         except:
@@ -207,6 +218,12 @@ def gamesmanVision(capture):
             
             
         if(dogrid):
+            try:
+                for i in range(len(centers)):
+                    avgcenters[i] = (avgcenters[i] + centers[i]) / 2.0
+            except:
+                avgcenters = centers[:]
+            centers = avgcenters[:]
             #generate board string if found!
             #generate sampling distance
             sd =  piecesize / 3
@@ -223,7 +240,10 @@ def gamesmanVision(capture):
                     angle = random.random()*3.14
                     x = math.cos(angle)*dist
                     y = math.sin(angle)*dist
-                    color = img[cx+x,cy+y]
+                    try:
+                        color = img[cx+x,cy+y]
+                    except:
+                        continue
                     runningsum += color
                 runningsum = runningsum / 25
                 centers[index].append(runningsum)
@@ -301,7 +321,7 @@ def gamesmanVision(capture):
 
                     
             if(not testimage):
-                image[.25*width:.75*width, .25*height:.75*height] = img
+                image[(1-screenpercent)*width:screenpercent*width, (1-screenpercent)*height:(screenpercent)*height] = img
                 img = drawBoardOverlay(image)
                 
             ans = board_to_response(BOARD)
@@ -324,16 +344,16 @@ def gamesmanVision(capture):
                         color = moves[str(i)]
                     #figure out position of this rectangle
                     #centered at
-                    cent = (centers_kmeans_x[i],centers_kmeans_y[5]+piecesize)
+                    cent = (centers_kmeans_x[i],centers_kmeans_y[0]+piecesize)
                     bottom_left = (cent[0]-piecesize/2, cent[1]-piecesize/2)
                     top_right = (cent[0]+piecesize/2, cent[1]+piecesize/2)
                     #these two locations relative from bottom left of sub-image
                     pt1 = bottom_left 
                     pt2 = top_right 
-                    pt1 = (int(pt1[0]+height*.25), int(pt1[1]-width*.25))
-                    pt2 = (int(pt2[0]+height*.25), int(pt2[1]-width*.25))
-                    print pt1, pt2
+                    pt1 = (int(pt1[0]+height*(1-screenpercent)), int(pt1[1]-width*(1-screenpercent)))
+                    pt2 = (int(pt2[0]+height*(1-screenpercent)), int(pt2[1]-width*(1-screenpercent)))
                     cv2.rectangle(img,pt1,pt2,color,-1)
+            img = cv2.resize(img, None, fx=1.5, fy =1.5)
             cv2.imshow('GamesmanVision',img) 
     #clean up
     cv2.destroyAllWindows()
