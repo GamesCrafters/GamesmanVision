@@ -1,8 +1,0 @@
-implement culling of non-grid-fitting circles
-
-
-assumption is that nongrid circles are fewer in number than grid circles (like, only one or two of them)
-
-
-1.  sort grid into x and y groupings
-2.  cull outliers
