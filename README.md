@@ -1,8 +1,6 @@
 GamesmanVision
 ==============
 
-Augmented reality Gamesman.  First target:  Connect 4
+Augmented reality Gamesman.
 
-
-Todo:
-Explore correlation techniques.  Naive correlation works well with black pieces, but isn't good at red or empty.
+Primary file is c4cv.py
